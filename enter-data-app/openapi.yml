@@ -1,0 +1,61 @@
+openapi: 3.0.0
+info:
+  title: Enter Data Service
+  version: 1.0.0
+
+paths:
+  /:
+    post:
+      summary: Add a new customer
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Customer added
+
+  /product:
+    post:
+      summary: Add a new product
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                product_name:
+                  type: string
+                price:
+                  type: number
+      responses:
+        '200':
+          description: Product added
+
+  /sale:
+    post:
+      summary: Record a sale
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                customer_id:
+                  type: integer
+                product_id:
+                  type: integer
+                quantity:
+                  type: integer
+      responses:
+        '200':
+          description: Sale recorded
