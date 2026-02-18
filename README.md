@@ -1,6 +1,6 @@
 # acit3495-project-1
 
-## Jessica (mysql & Enter Data Web app)
+### Jessica (mysql & Enter Data Web app)
 
 ## Directories: 
 
