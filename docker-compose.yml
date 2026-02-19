@@ -1,26 +1,125 @@
 version: '3.8'
+
 services:
+
   mysql:
-    build: ./mysql
-    container_name: mysql
-    ports:
-      - "3307:3306" #changed due to internal port mapping config
+    image: mysql:8.0
+    container_name: mysql-db
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: project1
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    ports:
+      - "${MONGO_PORT}:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service
+    ports:
+      - "${ANALYTICS_SERVICE_PORT}:${ANALYTICS_SERVICE_PORT}"
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - ANALYTICS_COLLECTION=${ANALYTICS_COLLECTION}
+      - ANALYTICS_SERVICE_PORT=${ANALYTICS_SERVICE_PORT}
+      - FLASK_PORT=${ANALYTICS_SERVICE_PORT}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./analytics-service:/app
+    restart: on-failure
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT}:5001"
+    environment:
+      - PORT=${AUTH_SERVICE_PORT}
+      - JWT_SECRET=${JWT_SECRET}
+      - TOKEN_TTL_SECONDS=${TOKEN_TTL_SECONDS}
+    env_file:
+      - .env
+    restart: on-failure
 
   enter-data-app:
     build: ./enter-data-app
     container_name: enter-data-app
     ports:
-      - "5000:5000"
+      - "${ENTER_DATA_PORT}:5000"
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+    env_file:
+      - .env
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: on-failure
+
+  show-results-app:
+    build: ./show-results-app
+    container_name: show-results-app
+    ports:
+      - "${SHOW_RESULTS_PORT}:5002"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - ANALYTICS_COLLECTION=${ANALYTICS_COLLECTION}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - SHOW_RESULTS_PORT=${SHOW_RESULTS_PORT}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: on-failure
 
 volumes:
   mysql_data:
+  mongo_data:
+
+networks:
+  default:
+    driver: bridge
