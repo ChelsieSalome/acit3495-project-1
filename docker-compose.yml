@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+
+  # MySQL
+
   mysql:
     image: mysql:8.0
     container_name: mysql-db
@@ -10,15 +13,18 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql-service/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
       timeout: 20s
       retries: 10
 
+  # MongoDB
   mongodb:
     image: mongo:7.0
     container_name: mongodb
@@ -27,10 +33,12 @@ services:
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ismaster')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
       timeout: 10s
       retries: 5
 
+  # Analytics Service
   analytics-service:
     build: ./analytics-service
     container_name: analytics-service
@@ -38,13 +46,18 @@ services:
       - "${ANALYTICS_SERVICE_PORT}:${ANALYTICS_SERVICE_PORT}"
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MONGO_URI=${MONGO_URI}
       - MONGO_DB=${MONGO_DB}
+      - ANALYTICS_COLLECTION=${ANALYTICS_COLLECTION}
+      - ANALYTICS_SERVICE_PORT=${ANALYTICS_SERVICE_PORT}
       - FLASK_PORT=${ANALYTICS_SERVICE_PORT}
       - FLASK_DEBUG=${FLASK_DEBUG}
+    env_file:
+      - .env
     depends_on:
       mysql:
         condition: service_healthy
@@ -52,6 +65,7 @@ services:
         condition: service_healthy
     volumes:
       - ./analytics-service:/app
+    restart: on-failure
 
 volumes:
   mysql_data:

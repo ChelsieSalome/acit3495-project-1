@@ -112,7 +112,7 @@ components:
         total_quantity_sold:
           type: integer
           example: 500
-    
+
     Customer:
       type: object
       properties:
@@ -126,7 +126,7 @@ components:
           type: number
           format: float
           example: 9999.99
-    
+
     Error:
       type: object
       properties:
