@@ -512,15 +512,17 @@ def index():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            # FIX: buffered=True prevents "Unread result found" error
             cursor = conn.cursor(buffered=True)
 
-            cursor.execute("SELECT id FROM customers WHERE email = %s", (email,))
+            cursor.execute("SELECT customer_id FROM customers WHERE email = %s", (email,))
             if cursor.fetchone():
                 cursor.close(); conn.close()
                 return render_template_string(CUSTOMER_TEMPLATE, error="A customer with this email already exists.")
 
-            cursor.execute("INSERT INTO customers (name, email) VALUES (%s, %s)", (name, email))
+            cursor.execute(
+                "INSERT INTO customers (customer_name, email) VALUES (%s, %s)",
+                (name, email)
+            )
             conn.commit()
             cursor.close(); conn.close()
             return redirect(url_for("dashboard", success="Customer added successfully!"))
@@ -555,15 +557,17 @@ def product():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            # FIX: buffered=True prevents "Unread result found" error
             cursor = conn.cursor(buffered=True)
 
-            cursor.execute("SELECT id FROM products WHERE name = %s", (product_name,))
+            cursor.execute("SELECT product_id FROM products WHERE product_name = %s", (product_name,))
             if cursor.fetchone():
                 cursor.close(); conn.close()
                 return render_template_string(PRODUCT_TEMPLATE, error="A product with this name already exists.")
 
-            cursor.execute("INSERT INTO products (name, price) VALUES (%s, %s)", (product_name, price))
+            cursor.execute(
+                "INSERT INTO products (product_name, product_price) VALUES (%s, %s)",
+                (product_name, price)
+            )
             conn.commit()
             cursor.close(); conn.close()
             return redirect(url_for("dashboard", success="Product added successfully!"))
@@ -599,28 +603,27 @@ def sale():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            # FIX: buffered=True prevents "Unread result found" error
             cursor = conn.cursor(buffered=True)
 
-            cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
+            cursor.execute("SELECT customer_id FROM customers WHERE customer_id = %s", (customer_id,))
             if not cursor.fetchone():
                 cursor.close(); conn.close()
                 return render_template_string(SALE_TEMPLATE, error=f"Customer ID {customer_id} does not exist.")
 
-            cursor.execute("SELECT price FROM products WHERE id = %s", (product_id,))
+            cursor.execute("SELECT product_price FROM products WHERE product_id = %s", (product_id,))
             prod = cursor.fetchone()
             if not prod:
                 cursor.close(); conn.close()
                 return render_template_string(SALE_TEMPLATE, error=f"Product ID {product_id} does not exist.")
 
-            product_price = prod[0]
-            total_price   = product_price * quantity
-            order_date    = date.today()
+            product_price  = prod[0]
+            total_price    = product_price * quantity
+            purchase_date  = date.today()
 
             cursor.execute(
-                """INSERT INTO orders (customer_id, product_id, quantity, total_price, order_date)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (customer_id, product_id, quantity, total_price, order_date)
+                """INSERT INTO orders (customer_id, product_id, quantity, purchase_date)
+                   VALUES (%s, %s, %s, %s)""",
+                (customer_id, product_id, quantity, purchase_date)
             )
             conn.commit()
             cursor.close(); conn.close()
