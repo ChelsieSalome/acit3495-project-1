@@ -282,7 +282,7 @@ DASHBOARD_TEMPLATE = """
     <div class="page-body">
 
         <div class="header">
-            <h1>Enter Data Dashboard</h1>
+            <h1>What would you like to do?</h1>
             <div class="header-links">
                 <a href="/logout" class="btn-logout">Logout</a>
             </div>
@@ -296,15 +296,12 @@ DASHBOARD_TEMPLATE = """
 
         <div class="nav-grid">
             <a href="/customer" class="nav-card">
-                <span class="nav-card-label">Manage</span>
                 Add Customer
             </a>
             <a href="/product" class="nav-card">
-                <span class="nav-card-label">Manage</span>
                 Add Product
             </a>
             <a href="/sale" class="nav-card">
-                <span class="nav-card-label">Manage</span>
                 Record Sale
             </a>
         </div>
@@ -326,7 +323,7 @@ CUSTOMER_TEMPLATE = """
     <div class="page-body">
 
         <div class="header">
-            <h1>Enter Data Portal</h1>
+            <h1>Welcome !!</h1>
             <div class="header-links">
                 <a href="/dashboard" class="btn-secondary">Dashboard</a>
                 <a href="/logout" class="btn-logout">Logout</a>
