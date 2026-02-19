@@ -9,10 +9,8 @@ import logging
 app = Flask(__name__)
 CORS(app)
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 def get_mysql_connection():
@@ -25,12 +23,11 @@ def get_mysql_connection():
         database=Config.MYSQL_DATABASE
     )
 
-def get_mongodb_connection():
-    """Create MongoDB connection"""
+def get_mongodb_collection():
+    """Create MongoDB connection and return collection"""
     client = MongoClient(Config.MONGO_URI)
     db = client[Config.MONGO_DB]
-    return db[Config.ANALYTICS_COLLECTION]
-
+    return client, db[Config.ANALYTICS_COLLECTION]
 
 
 def get_highest_selling_product():
@@ -43,9 +40,9 @@ def get_highest_selling_product():
 
         query = """
             SELECT
-                p.id                    AS product_id,
-                p.name                  AS product_name,
-                SUM(o.quantity)         AS total_quantity_sold
+                p.id                AS product_id,
+                p.name              AS product_name,
+                SUM(o.quantity)     AS total_quantity_sold
             FROM products p
             JOIN orders o ON p.id = o.product_id
             GROUP BY p.id, p.name
@@ -57,22 +54,21 @@ def get_highest_selling_product():
         result = cursor.fetchone()
 
         if result:
-            # Convert Decimal to int for JSON serialization
             result['total_quantity_sold'] = int(result['total_quantity_sold'])
             return result
         else:
             return {
-                "product_id":           None,
-                "product_name":         "No sales data",
-                "total_quantity_sold":  0
+                "product_id":          None,
+                "product_name":        "No sales data",
+                "total_quantity_sold": 0
             }
 
     except Exception as e:
         logger.error(f"Error getting highest selling product: {e}")
         return {
-            "product_id":           None,
-            "product_name":         "Error retrieving data",
-            "total_quantity_sold":  0
+            "product_id":          None,
+            "product_name":        "Error retrieving data",
+            "total_quantity_sold": 0
         }
 
     finally:
@@ -90,14 +86,14 @@ def get_top_customer():
         conn   = get_mysql_connection()
         cursor = conn.cursor(dictionary=True)
 
+        # Uses o.total_price directly — consistent with stored sale values
         query = """
             SELECT
-                c.id                            AS customer_id,
-                c.name                          AS customer_name,
-                SUM(o.quantity * p.price)       AS total_purchase_value
+                c.id                    AS customer_id,
+                c.name                  AS customer_name,
+                SUM(o.total_price)      AS total_purchase_value
             FROM customers c
-            JOIN orders o   ON c.id = o.customer_id
-            JOIN products p ON p.id = o.product_id
+            JOIN orders o ON c.id = o.customer_id
             GROUP BY c.id, c.name
             ORDER BY total_purchase_value DESC
             LIMIT 1
@@ -107,22 +103,21 @@ def get_top_customer():
         result = cursor.fetchone()
 
         if result:
-            # Convert Decimal to float for JSON serialization
             result['total_purchase_value'] = float(result['total_purchase_value'])
             return result
         else:
             return {
-                "customer_id":           None,
-                "customer_name":         "No customer data",
-                "total_purchase_value":  0.0
+                "customer_id":          None,
+                "customer_name":        "No customer data",
+                "total_purchase_value": 0.0
             }
 
     except Exception as e:
         logger.error(f"Error getting top customer: {e}")
         return {
-            "customer_id":           None,
-            "customer_name":         "Error retrieving data",
-            "total_purchase_value":  0.0
+            "customer_id":          None,
+            "customer_name":        "Error retrieving data",
+            "total_purchase_value": 0.0
         }
 
     finally:
@@ -134,17 +129,17 @@ def get_top_customer():
 
 def store_analytics_in_mongodb(highest_selling_product, top_customer):
     """Store analytics results in MongoDB"""
+    client = None
     try:
-        collection = get_mongodb_connection()
+        client, collection = get_mongodb_collection()
 
         analytics_doc = {
-            "type":                     "latest",
-            "timestamp":                datetime.utcnow(),
-            "highest_selling_product":  highest_selling_product,
-            "top_customer":             top_customer
+            "type":                    "latest",
+            "timestamp":               datetime.utcnow(),
+            "highest_selling_product": highest_selling_product,
+            "top_customer":            top_customer
         }
 
-        # Replace existing "latest" document or insert if not found
         collection.replace_one(
             {"type": "latest"},
             analytics_doc,
@@ -158,6 +153,9 @@ def store_analytics_in_mongodb(highest_selling_product, top_customer):
         logger.error(f"Error storing data in MongoDB: {e}")
         return False
 
+    finally:
+        if client:
+            client.close()
 
 
 @app.route("/health", methods=["GET"])
@@ -172,19 +170,13 @@ def health():
 
 @app.route("/run-analytics", methods=["POST"])
 def run_analytics():
-    """
-    Trigger analytics calculation:
-    1. Query MySQL for insights
-    2. Store results in MongoDB
-    """
+    """Trigger analytics calculation"""
     try:
         logger.info("Starting analytics calculation...")
 
-        # Get analytics data from MySQL
         highest_selling_product = get_highest_selling_product()
         top_customer            = get_top_customer()
 
-        # Store results in MongoDB
         success = store_analytics_in_mongodb(highest_selling_product, top_customer)
 
         if success:
@@ -211,15 +203,15 @@ def run_analytics():
 @app.route("/analytics-status", methods=["GET"])
 def analytics_status():
     """Get the latest analytics data from MongoDB"""
+    client = None
     try:
-        collection = get_mongodb_connection()
+        client, collection = get_mongodb_collection()
         result = collection.find_one(
             {"type": "latest"},
-            {"_id": 0}  # Exclude MongoDB internal _id field
+            {"_id": 0}
         )
 
         if result:
-            # Convert datetime to ISO string for JSON serialization
             if "timestamp" in result:
                 result["timestamp"] = result["timestamp"].isoformat()
             return jsonify(result), 200
@@ -233,6 +225,10 @@ def analytics_status():
         return jsonify({
             "error": f"Failed to retrieve analytics: {str(e)}"
         }), 500
+
+    finally:
+        if client:
+            client.close()
 
 
 if __name__ == "__main__":
