@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  mysql:
+    build: ./mysql
+    container_name: mysql
+    ports:
+      - "3307:3306" #changed due to internal port mapping config
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: project1
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+  
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    environment:
+      PORT: 5001
+      JWT_SECRET: "change_this_in_real_life"
+      TOKEN_TTL_SECONDS: 3600
+    ports:
+      - "5001:5001"
+
+  enter-data-app:
+    build: ./enter-data-app
+    container_name: enter-data-app
+    ports:
+      - "5000:5000"
+    environment:
+      AUTH_SERVICE_URL: "http://auth-service:5001"
+    depends_on:
+      - mysql
+      - auth-service
+
+volumes:
+  mysql_data:
