@@ -63,6 +63,41 @@ services:
       - ./analytics-service:/app
     restart: on-failure
 
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT}:5001"
+    environment:
+      - PORT=${AUTH_SERVICE_PORT}
+      - JWT_SECRET=${JWT_SECRET}
+      - TOKEN_TTL_SECONDS=${TOKEN_TTL_SECONDS}
+    env_file:
+      - .env
+    restart: on-failure
+
+  enter-data-app:
+    build: ./enter-data-app
+    container_name: enter-data-app
+    ports:
+      - "${ENTER_DATA_PORT}:5000"
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: on-failure
+
+
+
 volumes:
   mysql_data:
   mongo_data:
