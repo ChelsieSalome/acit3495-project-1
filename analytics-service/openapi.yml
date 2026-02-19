@@ -1,0 +1,135 @@
+openapi: 3.0.0
+info:
+  title: Analytics Service API
+  description: Processes MySQL data and stores analytics in MongoDB
+  version: 1.0.0
+servers:
+  - url: http://localhost:5004
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  service:
+                    type: string
+                    example: "analytics-service"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /run-analytics:
+    post:
+      summary: Run analytics calculation
+      description: |
+        Triggers analytics processing:
+        1. Queries MySQL for highest selling product and top customer
+        2. Stores results in MongoDB
+      responses:
+        '200':
+          description: Analytics completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Analytics completed successfully"
+                  results:
+                    type: object
+                    properties:
+                      highest_selling_product:
+                        $ref: '#/components/schemas/Product'
+                      top_customer:
+                        $ref: '#/components/schemas/Customer'
+                  timestamp:
+                    type: string
+                    format: date-time
+        '500':
+          description: Analytics calculation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /analytics-status:
+    get:
+      summary: Get current analytics data
+      description: Returns the latest analytics results stored in MongoDB
+      responses:
+        '200':
+          description: Analytics data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: "latest"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  highest_selling_product:
+                    $ref: '#/components/schemas/Product'
+                  top_customer:
+                    $ref: '#/components/schemas/Customer'
+        '404':
+          description: No analytics data available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "No analytics data available. Run /run-analytics first."
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        product_name:
+          type: string
+          example: "Widget A"
+        total_quantity_sold:
+          type: integer
+          example: 500
+    
+    Customer:
+      type: object
+      properties:
+        customer_id:
+          type: integer
+          example: 3
+        customer_name:
+          type: string
+          example: "Jane Doe"
+        total_purchase_value:
+          type: number
+          format: float
+          example: 9999.99
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Analytics calculation failed"
