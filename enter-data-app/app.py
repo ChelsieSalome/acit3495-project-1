@@ -5,12 +5,14 @@ import os
 
 app = Flask(__name__)
 
+
 db_config = {
-    "host": "mysql",
-    "user": "user",
-    "password": "password",
-    "database": "project1"
+    "host": os.environ.get("MYSQL_HOST", "mysql"),
+    "user": os.environ.get("MYSQL_USER", "user"),
+    "password": os.environ.get("MYSQL_PASSWORD", "password"),
+    "database": os.environ.get("MYSQL_DATABASE", "project1")
 }
+
 
 # ---- Auth service config (service name inside docker-compose network) ----
 AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:5001")
