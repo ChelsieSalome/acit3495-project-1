@@ -20,9 +20,7 @@ AUTH_SERVICE_URL  = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:5001
 TOKEN_COOKIE_NAME = "auth_token"
 
 
-# -------------------------
-# Auth Helpers
-# -------------------------
+
 def verify_token(token: str) -> bool:
     if not token:
         return False
@@ -43,9 +41,7 @@ def require_auth():
     return None
 
 
-# =========================================================
-# SHARED CSS
-# =========================================================
+
 SHARED_CSS = """
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -221,9 +217,6 @@ SHARED_CSS = """
 """
 
 
-# =========================================================
-# HTML TEMPLATES
-# =========================================================
 
 LOGIN_TEMPLATE = """
 <!DOCTYPE html>
@@ -522,7 +515,8 @@ def index():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM customers WHERE email = %s", (email,))
             if cursor.fetchone():
@@ -564,7 +558,8 @@ def product():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM products WHERE name = %s", (product_name,))
             if cursor.fetchone():
@@ -607,7 +602,8 @@ def sale():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
             if not cursor.fetchone():
@@ -647,9 +643,7 @@ def health():
     }), 200
 
 
-# =========================================================
-# ENTRY POINT
-# =========================================================
+
 if __name__ == "__main__":
     port  = int(os.environ.get("ENTER_DATA_PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
