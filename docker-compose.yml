@@ -16,7 +16,6 @@ services:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 20s
@@ -96,7 +95,26 @@ services:
         condition: service_started
     restart: on-failure
 
-
+  show-results-app:
+    build: ./show-results-app
+    container_name: show-results-app
+    ports:
+      - "${SHOW_RESULTS_PORT}:5002"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - ANALYTICS_COLLECTION=${ANALYTICS_COLLECTION}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - SHOW_RESULTS_PORT=${SHOW_RESULTS_PORT}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: on-failure
 
 volumes:
   mysql_data:
