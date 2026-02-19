@@ -1,5 +1,137 @@
 # acit3495-project-1
 
+### Overview
+
+This project implements a containerized microservices data collection system.
+
+The system consists of:
+
+- Enter Data Web App (Flask)
+
+- Authentication Service (Node.js)
+
+- MySQL Database
+
+The Enter Data Service collects customer, product, and sales data.
+However, users must first be authenticated through the Authentication Service before they are allowed to submit data.
+
+All services communicate over Docker Compose’s internal network.
+
+## Architecture Flow
+
+1. **User accesses Enter Data Web App**
+
+If not authenticated → user is redirected to /login.
+
+2. **Login Process**
+
+The Enter Data app sends credentials to:
+
+auth-service:5001/login
+
+
+If valid, the Authentication Service returns a JWT token.
+
+The token is stored in an HTTP-only cookie.
+
+3. **Accessing Protected Endpoints**
+
+Before allowing access to:
+```
+/
+
+/product
+
+/sale
+```
+
+The Enter Data app verifies the token by calling:
+```
+auth-service:5001/verify
+```
+
+If the token is valid → request proceeds.
+If invalid → user is redirected to login.
+
+## Technologies Used
+
+**Enter Data Service**
+
+- Python 3.11
+- Flask
+- mysql-connector-python
+
+**Authentication Service**
+
+- Node.js
+- Express
+- jsonwebtoken (JWT)
+
+**Database**
+
+- MySQL 8.0
+- MongoDB
+
+**Infrastructure**
+
+- Docker
+- Docker Compose
+- OpenAPI 3.0
+
+
+# Authentication Service
+
+The Authentication Service is implemented as a separate microservice.
+
+## Endpoints
+
+POST `/login`
+
+Request (JSON):
+```
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+Response:
+```
+{
+  "token": "<jwt_token>",
+  "expires_in": 3600
+}
+```
+
+GET `/verify`
+
+Header:
+```
+Authorization: Bearer <token>
+```
+
+Response:
+```
+{
+  "valid": true,
+  "username": "admin"
+}
+```
+
+### Hardcoded Users
+
+For simplicity:
+```
+admin / admin123
+
+user / user123
+```
+
+The goal of this service is to demonstrate microservice communication, not production-grade identity management.
+
+
+# Database Service
+
 ### Jessica (mysql & Enter Data Web app)
 
 ## Directories:
