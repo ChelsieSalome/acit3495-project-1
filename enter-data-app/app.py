@@ -20,9 +20,7 @@ AUTH_SERVICE_URL  = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:5001
 TOKEN_COOKIE_NAME = "auth_token"
 
 
-# -------------------------
-# Auth Helpers
-# -------------------------
+
 def verify_token(token: str) -> bool:
     if not token:
         return False
@@ -43,9 +41,7 @@ def require_auth():
     return None
 
 
-# =========================================================
-# SHARED CSS
-# =========================================================
+
 SHARED_CSS = """
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -221,9 +217,6 @@ SHARED_CSS = """
 """
 
 
-# =========================================================
-# HTML TEMPLATES
-# =========================================================
 
 LOGIN_TEMPLATE = """
 <!DOCTYPE html>
@@ -282,7 +275,7 @@ DASHBOARD_TEMPLATE = """
     <div class="page-body">
 
         <div class="header">
-            <h1>Enter Data Dashboard</h1>
+            <h1>What would you like to do?</h1>
             <div class="header-links">
                 <a href="/logout" class="btn-logout">Logout</a>
             </div>
@@ -323,7 +316,7 @@ CUSTOMER_TEMPLATE = """
     <div class="page-body">
 
         <div class="header">
-            <h1>Welcome!</h1>
+            <h1>Welcome !!</h1>
             <div class="header-links">
                 <a href="/dashboard" class="btn-secondary">Dashboard</a>
                 <a href="/logout" class="btn-logout">Logout</a>
@@ -368,7 +361,7 @@ PRODUCT_TEMPLATE = """
     <div class="page-body">
 
         <div class="header">
-            <h1>What would you like to do?</h1>
+            <h1>Enter Data Portal</h1>
             <div class="header-links">
                 <a href="/dashboard" class="btn-secondary">Dashboard</a>
                 <a href="/logout" class="btn-logout">Logout</a>
@@ -450,9 +443,6 @@ SALE_TEMPLATE = """
 """
 
 
-# =========================================================
-# ROUTES
-# =========================================================
 
 @app.route("/")
 @app.route("/dashboard")
@@ -522,7 +512,8 @@ def index():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM customers WHERE email = %s", (email,))
             if cursor.fetchone():
@@ -564,7 +555,8 @@ def product():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM products WHERE name = %s", (product_name,))
             if cursor.fetchone():
@@ -607,7 +599,8 @@ def sale():
 
         try:
             conn   = mysql.connector.connect(**db_config)
-            cursor = conn.cursor()
+            # FIX: buffered=True prevents "Unread result found" error
+            cursor = conn.cursor(buffered=True)
 
             cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
             if not cursor.fetchone():
