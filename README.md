@@ -1,5 +1,7 @@
 # acit3495-project-1
 
+* Salome Chelsie Lele Wambo - A01372274
+
 ## Overview
 
 This project implements a containerized microservices data collection system.
