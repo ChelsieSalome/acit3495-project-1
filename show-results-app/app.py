@@ -4,23 +4,26 @@ from flask import Flask, request, render_template_string, redirect, url_for, mak
 import requests
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
+import logging
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # -------------------------
 # Auth config
 # -------------------------
-AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:5001")
+AUTH_SERVICE_URL  = os.environ.get("AUTH_SERVICE_URL", "http://auth-service:5001")
 TOKEN_COOKIE_NAME = "auth_token"
 
 # -------------------------
-# Mongo config (placeholders)
+# Mongo config
 # -------------------------
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongodb:27017")
-MONGO_DB = os.environ.get("MONGO_DB", "project1")
-MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "analytics_results")
+MONGO_URI        = os.environ.get("MONGO_URI",        "mongodb://mongodb:27017")
+MONGO_DB         = os.environ.get("MONGO_DB",         "analytics_db")
+MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "analytics")
 
-# Create Mongo client (lazy safe usage in fetch function)
+# Create Mongo client
 mongo_client = MongoClient(MONGO_URI)
 
 # -------------------------
@@ -45,81 +48,287 @@ def require_auth():
         return redirect(url_for("login"))
     return None
 
+
 # -------------------------
-# Login / Logout
+# Shared CSS
 # -------------------------
-login_form = """
-<h2>Show Results - Login</h2>
-<form method="POST">
-  Username: <input name="username"><br>
-  Password: <input name="password" type="password"><br>
-  <input type="submit" value="Login">
-</form>
-{% if error %}<p style="color:red;">{{ error }}</p>{% endif %}
+SHARED_CSS = """
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #f0f2f5;
+        min-height: 100vh;
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: white;
+        padding: 16px 28px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 28px;
+    }
+    .header h1 { font-size: 1.4rem; color: #333; }
+    .header-links a {
+        margin-left: 16px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: bold;
+    }
+    .btn-primary        { background: #4A90D9; color: white; }
+    .btn-primary:hover  { background: #357ABD; }
+    .btn-logout         { background: #e74c3c; color: white; }
+    .btn-logout:hover   { background: #c0392b; }
+    .btn-secondary      { background: #f0f2f5; color: #333; border: 1px solid #ddd; }
+    .btn-secondary:hover { background: #e2e5e9; }
+
+    .page-body {
+        padding: 30px 20px;
+    }
+
+    /* Card */
+    .card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        padding: 32px;
+        max-width: 560px;
+        margin: 0 auto;
+    }
+    .card-title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #888;
+        margin-bottom: 4px;
+        font-weight: bold;
+    }
+    .card-name {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 24px;
+    }
+
+    /* Alerts */
+    .alert-error {
+        background: #ffe0e0;
+        color: #c0392b;
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-bottom: 18px;
+        font-size: 0.875rem;
+    }
+    .alert-success {
+        background: #eafaf1;
+        color: #27ae60;
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-bottom: 18px;
+        font-size: 0.875rem;
+        font-weight: bold;
+    }
+
+    /* Form Elements */
+    label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.875rem;
+        color: #555;
+        font-weight: bold;
+    }
+    input[type=text],
+    input[type=password] {
+        width: 100%;
+        padding: 10px 12px;
+        margin-bottom: 18px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+    input[type=text]:focus,
+    input[type=password]:focus {
+        outline: none;
+        border-color: #4A90D9;
+        box-shadow: 0 0 0 2px rgba(74,144,217,0.15);
+    }
+    input[type=submit] {
+        width: 100%;
+        padding: 11px;
+        background: #4A90D9;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+        font-weight: bold;
+        margin-top: 4px;
+    }
+    input[type=submit]:hover { background: #357ABD; }
+
+    /* Analytics Table */
+    .analytics-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+    }
+    .analytics-table th {
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #888;
+        border-bottom: 2px solid #f0f2f5;
+        font-weight: bold;
+    }
+    .analytics-table td {
+        padding: 12px 14px;
+        font-size: 0.95rem;
+        color: #2c3e50;
+        border-bottom: 1px solid #f0f2f5;
+    }
+    .analytics-table tr:last-child td {
+        border-bottom: none;
+    }
+    .analytics-table td:first-child {
+        color: #555;
+        font-weight: bold;
+        width: 55%;
+    }
+
+    /* Last updated */
+    .last-updated {
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-bottom: 20px;
+    }
+
+    /* Back link */
+    .back-link {
+        display: inline-block;
+        margin-top: 18px;
+        color: #4A90D9;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    .back-link:hover { text-decoration: underline; }
 """
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-
-        if not username or not password:
-            return render_template_string(login_form, error="Missing username or password")
-
-        try:
-            r = requests.post(
-                f"{AUTH_SERVICE_URL}/login",
-                json={"username": username, "password": password},
-                timeout=3
-            )
-        except requests.RequestException:
-            return render_template_string(login_form, error="Auth service unreachable")
-
-        if r.status_code != 200:
-            return render_template_string(login_form, error="Invalid credentials")
-
-        token = r.json().get("token")
-        if not token:
-            return render_template_string(login_form, error="Auth service returned no token")
-
-        resp = make_response(redirect(url_for("results")))
-        resp.set_cookie(TOKEN_COOKIE_NAME, token, httponly=True, samesite="Lax")
-        return resp
-
-    return render_template_string(login_form, error=None)
-
-@app.route("/logout", methods=["GET", "POST"])
-def logout():
-    resp = make_response(redirect(url_for("login")))
-    resp.set_cookie(TOKEN_COOKIE_NAME, "", expires=0)
-    return resp
 
 # -------------------------
-# Mongo fetch layer (EDIT THIS LATER)
+# Templates
+# -------------------------
+LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Show Results - Login</title>
+    <style>
+        """ + SHARED_CSS + """
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-wrap {
+            width: 100%;
+            max-width: 380px;
+            padding: 20px;
+        }
+        .card h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: #333;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="card">
+            <h2>Show Results</h2>
+            {% if error %}
+                <div class="alert-error">{{ error }}</div>
+            {% endif %}
+            <form method="POST">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+                <input type="submit" value="Login">
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+RESULTS_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics Results</title>
+    <style>""" + SHARED_CSS + """</style>
+</head>
+<body>
+    <div class="page-body">
+
+        <div class="header">
+            <h1>Analytics Results</h1>
+            <div class="header-links">
+                <a href="/results" class="btn-secondary">Refresh</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Overview</div>
+            <div class="card-name">Latest Analytics</div>
+
+            {% if updated_at %}
+                <p class="last-updated">Last Updated: {{ updated_at }}</p>
+            {% else %}
+                <p class="last-updated">Last Updated: Unknown</p>
+            {% endif %}
+
+            {% if error %}
+                <div class="alert-error">{{ error }}</div>
+            {% endif %}
+
+            <table class="analytics-table">
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.label }}</td>
+                    <td>{{ item.value }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+        </div>
+
+    </div>
+</body>
+</html>
+"""
+
+
+# -------------------------
+# Mongo fetch layer
 # -------------------------
 def fetch_analytics_from_mongo() -> dict:
-    """
-    Placeholder function.
-    Once you know the Mongo schema, edit ONLY this function.
-
-    Return format used by the UI:
-    {
-      "updated_at": "...",
-      "items": [
-        {"label": "Total Sales", "value": 123},
-        {"label": "Max Quantity", "value": 10},
-        {"label": "Min Quantity", "value": 1},
-        {"label": "Average Quantity", "value": 4.2},
-      ]
-    }
-    """
     try:
-        db = mongo_client[MONGO_DB]
+        db  = mongo_client[MONGO_DB]
         col = db[MONGO_COLLECTION]
 
-        # --- Placeholder query: get most recent analytics doc (common pattern) ---
-        doc = col.find_one(sort=[("updated_at", -1)])
+        doc = col.find_one({"type": "latest"}, {"_id": 0})
 
         if not doc:
             return {
@@ -129,17 +338,23 @@ def fetch_analytics_from_mongo() -> dict:
                 ],
             }
 
-        # --- Schema-agnostic: show keys for now ---
-        # Remove Mongo _id from display
-        doc.pop("_id", None)
+        timestamp = doc.get("timestamp")
+        if isinstance(timestamp, datetime):
+            timestamp = timestamp.isoformat()
 
-        items = []
-        for k, v in doc.items():
-            items.append({"label": str(k), "value": str(v)})
+        hsp = doc.get("highest_selling_product", {})
+        tc  = doc.get("top_customer", {})
+
+        items = [
+            {"label": "Top Product",         "value": hsp.get("product_name",        "N/A")},
+            {"label": "Total Quantity Sold",  "value": hsp.get("total_quantity_sold",  "N/A")},
+            {"label": "Top Customer",         "value": tc.get("customer_name",         "N/A")},
+            {"label": "Total Purchase Value", "value": f"${tc.get('total_purchase_value', 0):.2f}"},
+        ]
 
         return {
-            "updated_at": doc.get("updated_at"),
-            "items": items,
+            "updated_at": timestamp,
+            "items":      items,
         }
 
     except PyMongoError as e:
@@ -150,38 +365,53 @@ def fetch_analytics_from_mongo() -> dict:
             ],
         }
 
+
 # -------------------------
-# Results UI (protected)
+# Routes
 # -------------------------
-results_page = """
-<h2>Analytics Results</h2>
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
 
-<p>
-  <a href="/results">Refresh</a> |
-  <a href="/logout">Logout</a>
-</p>
+        if not username or not password:
+            return render_template_string(LOGIN_TEMPLATE, error="Username and password are required.")
 
-{% if updated_at %}
-<p><b>Last Updated:</b> {{ updated_at }}</p>
-{% else %}
-<p><b>Last Updated:</b> (unknown)</p>
-{% endif %}
+        try:
+            r = requests.post(
+                f"{AUTH_SERVICE_URL}/login",
+                json={"username": username, "password": password},
+                timeout=3
+            )
+        except requests.RequestException:
+            return render_template_string(LOGIN_TEMPLATE, error="Auth service is unreachable. Please try again.")
 
-<table border="1" cellpadding="6" cellspacing="0">
-  <tr><th>Metric</th><th>Value</th></tr>
-  {% for item in items %}
-    <tr>
-      <td>{{ item.label }}</td>
-      <td>{{ item.value }}</td>
-    </tr>
-  {% endfor %}
-</table>
-"""
+        if r.status_code != 200:
+            return render_template_string(LOGIN_TEMPLATE, error="Invalid username or password.")
+
+        token = r.json().get("token")
+        if not token:
+            return render_template_string(LOGIN_TEMPLATE, error="Auth service returned no token.")
+
+        resp = make_response(redirect(url_for("results")))
+        resp.set_cookie(TOKEN_COOKIE_NAME, token, httponly=True, samesite="Lax")
+        return resp
+
+    return render_template_string(LOGIN_TEMPLATE, error=None)
+
+
+@app.route("/logout", methods=["GET", "POST"])
+def logout():
+    resp = make_response(redirect(url_for("login")))
+    resp.set_cookie(TOKEN_COOKIE_NAME, "", expires=0)
+    return resp
+
 
 @app.route("/")
 def home():
-    # Just redirect to results; auth will handle login redirect if needed
     return redirect(url_for("results"))
+
 
 @app.route("/results")
 def results():
@@ -191,14 +421,17 @@ def results():
 
     data = fetch_analytics_from_mongo()
     return render_template_string(
-        results_page,
+        RESULTS_TEMPLATE,
         updated_at=data.get("updated_at"),
         items=data.get("items", []),
     )
+
 
 @app.route("/health")
 def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
+
 if __name__ == "__main__":
+    logger.info("Starting Show Results App on port 5002")
     app.run(host="0.0.0.0", port=5002)
