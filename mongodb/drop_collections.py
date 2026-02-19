@@ -9,15 +9,15 @@ def drop_collections():
 
     if Config.ANALYTICS_COLLECTION in existing_collections:
         db[Config.ANALYTICS_COLLECTION].drop()
-        print(f"🗑️  Collection '{Config.ANALYTICS_COLLECTION}' dropped.")
+        print(f"Collection '{Config.ANALYTICS_COLLECTION}' dropped.")
     else:
-        print(f"ℹ️  Collection '{Config.ANALYTICS_COLLECTION}' does not exist.")
+        print(f"Collection '{Config.ANALYTICS_COLLECTION}' does not exist.")
 
     client.close()
-    print("✅ Done.")
+    print("Done.")
 
 if __name__ == "__main__":
-    confirm = input("⚠️  This will delete all data. Type 'yes' to confirm: ")
+    confirm = input("This will delete all data. Type 'yes' to confirm: ")
     if confirm.lower() == "yes":
         drop_collections()
     else:

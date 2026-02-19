@@ -1,16 +1,20 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 from config import Config
 
+
+CORS(app) 
+
+
 app = Flask(__name__)
 
-# ── MongoDB Connection ────────────────────────────────────────────────────────
+#  MongoDB Connection 
 client = MongoClient(Config.MONGO_URI)
 db = client[Config.MONGO_DB]
 collection = db[Config.ANALYTICS_COLLECTION]
 
-
-# ── Routes ────────────────────────────────────────────────────────────────────
+# Routes 
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -45,7 +49,7 @@ def get_analytics():
         return jsonify({"error": str(e)}), 500
 
 
-# ── Entry Point ───────────────────────────────────────────────────────────────
+#  Entry Point 
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",

@@ -28,7 +28,7 @@ def create_collections():
         
         db = client[Config.MONGO_DB]
 
-        # ── Create analytics_results collection ──────────────────────────
+        #  Create analytics_results collection 
         existing_collections = db.list_collection_names()
         print(f"Existing collections: {existing_collections}")
 
@@ -38,7 +38,7 @@ def create_collections():
         else:
             print(f"Collection '{Config.ANALYTICS_COLLECTION}' already exists.")
 
-        # ── Create index on 'type' field for fast lookups ─────────────────
+        #  Create index on 'type' field for fast lookups 
         collection = db[Config.ANALYTICS_COLLECTION]
         
         try:

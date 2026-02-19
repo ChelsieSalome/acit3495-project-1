@@ -12,5 +12,5 @@ class Config:
     FLASK_PORT  = int(os.getenv("FLASK_PORT", 5003))
     FLASK_DEBUG = os.getenv("FLASK_DEBUG", "False") == "True"
 
-    # Collection names — defined once, used everywhere
+    # Collection names, defined once, used everywhere
     ANALYTICS_COLLECTION = "analytics_results"
