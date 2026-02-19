@@ -1,5 +1,5 @@
 -- mysql/init.sql
-
+CREATE DATABASE IF NOT EXISTS project1;
 CREATE TABLE Customer (
     Customer_id INT AUTO_INCREMENT PRIMARY KEY,
     Customer_name VARCHAR(100),
