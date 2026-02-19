@@ -1,6 +1,6 @@
 # acit3495-project-1
 
-### Overview
+## Overview
 
 This project implements a containerized microservices data collection system.
 
@@ -333,6 +333,212 @@ SELECT * FROM Sale;
 
 ---
 
+# Docker-compose: Line by Line Explanation
+
+---
+
+## Top-Level Configuration
+
+```yaml
+version: '3.8'
+```
+> Specifies the Docker Compose file format version. Version `3.8` supports advanced features like health check conditions in `depends_on`.
+
+---
+
+```yaml
+services:
+```
+> Defines all the containers (services) that will be built and run as part of this application stack.
+
+---
+
+## MySQL Service
+
+```yaml
+  mysql:
+```
+> Declares a service named `mysql`. This is the internal reference name used by other services.
+
+```yaml
+    image: mysql:8.0
+```
+> Pulls the official **MySQL version 8.0** image from Docker Hub. No build step needed.
+
+```yaml
+    container_name: mysql-db
+```
+> Assigns a fixed name `mysql-db` to the running container, overriding the default auto-generated name.
+
+```yaml
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+```
+> Injects environment variables into the container at runtime. Values are read from the `.env` file using `${}` substitution — **credentials are never hardcoded**.
+
+```yaml
+    ports:
+      - "3307:3306"
+```
+> Maps **host port 3307** to **container port 3306**. MySQL internally listens on `3306`, but is accessible from the host machine on `3307` to avoid conflicts with a locally installed MySQL instance.
+
+```yaml
+    volumes:
+      - mysql_data:/var/lib/mysql
+```
+> Mounts a **named volume** `mysql_data` to MySQL's data directory. This ensures database data **persists** even if the container is stopped or removed.
+
+```yaml
+      - ./mysql-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+```
+> Bind-mounts the local `init.sql` script into MySQL's init directory. MySQL **automatically executes** any `.sql` files in `/docker-entrypoint-initdb.d/` on first startup, it is used to create tables and seed data.
+
+```yaml
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+```
+> Defines a **health probe** that pings MySQL every `10s`. If no response within `20s`, it retries up to `10` times. Other services use this status before starting — preventing premature connections to an unready database.
+
+---
+
+## MongoDB Service
+
+```yaml
+  mongodb:
+```
+> Declares the MongoDB service, referenced internally by the name `mongodb`.
+
+```yaml
+    image: mongo:7.0
+```
+> Pulls the official **MongoDB version 7.0** image from Docker Hub.
+
+```yaml
+    container_name: mongodb
+```
+> Assigns the fixed container name `mongodb`.
+
+```yaml
+    ports:
+      - "${MONGO_PORT}:27017"
+```
+> Maps the host port (from `.env`, e.g. `27017`) to container port `27017`. MongoDB's default listening port.
+
+```yaml
+    volumes:
+      - mongo_data:/data/db
+```
+> Mounts named volume `mongo_data` to MongoDB's data directory `/data/db`, ensuring **data persistence** across container restarts.
+
+```yaml
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+```
+> Runs a `ping` command via the MongoDB shell (`mongosh`) every `10s`. Confirms MongoDB is **fully ready to accept connections** before dependent services start.
+
+---
+
+## Analytics Service
+
+```yaml
+  analytics-service:
+```
+> Declares the analytics Flask application service.
+
+```yaml
+    build: ./analytics-service
+```
+> Instead of pulling an image, Docker **builds a custom image** from the `Dockerfile` located in the `./analytics-service` directory.
+
+```yaml
+    container_name: analytics-service
+```
+> Assigns the fixed container name `analytics-service`.
+
+```yaml
+    ports:
+      - "${ANALYTICS_SERVICE_PORT}:${ANALYTICS_SERVICE_PORT}"
+```
+> Dynamically maps the host port to the container port using the same value from `.env` (e.g. `5004:5004`). Flask listens on this port inside the container.
+
+```yaml
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - ANALYTICS_COLLECTION=${ANALYTICS_COLLECTION}
+      - ANALYTICS_SERVICE_PORT=${ANALYTICS_SERVICE_PORT}
+      - FLASK_PORT=${ANALYTICS_SERVICE_PORT}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+```
+> Passes all required runtime configuration into the container. The Flask app reads these to connect to **MySQL** and **MongoDB**, and to configure its own port and debug mode. It helps keep all secrets out of source code.
+
+```yaml
+    env_file:
+      - .env
+```
+> Loads **all variables** from the `.env` file into the container's environment as a single block. It complements the explicit `environment:` declarations above.
+
+```yaml
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+```
+> Enforces **startup order with health awareness**. The analytics service will not start until both `mysql` and `mongodb` report a **healthy** status from their health checks. This helps us prevent failed connection attempts on startup.
+
+```yaml
+    volumes:
+      - ./analytics-service:/app
+```
+> Bind-mounts the local `./analytics-service` directory into the container at `/app`. This enables **live code reloading** during development: changes on the host are instantly reflected inside the container.
+
+```yaml
+    restart: on-failure
+```
+> Automatically **restarts the container** if it exits with a non-zero (error) code. Does not restart on intentional stops.
+
+---
+
+## Volumes
+
+```yaml
+volumes:
+  mysql_data:
+  mongo_data:
+```
+> Declares two **named volumes** managed by Docker. Named volumes persist data independently of the container lifecycle — data survives container removal and recreation.
+
+---
+
+## Networks
+
+```yaml
+networks:
+  default:
+    driver: bridge
+```
+> Explicitly defines the **default bridge network** for all services. The `bridge` driver creates an **isolated internal network** where services communicate using their **service names as hostnames** (e.g. `mysql-db`, `mongodb`), while remaining isolated from the host network by default.
+
+---
+
+> **Key Docker Concepts Demonstrated:** Image pulling, custom builds, named volumes for persistence, bind mounts for init scripts and live reload, environment variable injection via `.env`, health checks for dependency management, port mapping, and bridge networking for inter-service communication.
+
+
 ## Design Decisions
 
 * Flask was chosen because it is lightweight and easy to containerize.
@@ -341,6 +547,8 @@ SELECT * FROM Sale;
 * The OpenAPI file documents the service endpoints clearly for integration with other microservices.
 
 ---
+
+
 
 
 
