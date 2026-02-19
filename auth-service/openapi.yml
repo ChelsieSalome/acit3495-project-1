@@ -1,0 +1,37 @@
+openapi: 3.0.0
+info:
+  title: Authentication Service
+  version: 1.0.0
+paths:
+  /login:
+    post:
+      summary: Login and receive JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Token issued
+        "401":
+          description: Invalid credentials
+  /verify:
+    get:
+      summary: Verify token validity
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema: { type: string }
+          description: Bearer <token>
+      responses:
+        "200":
+          description: Valid token
+        "401":
+          description: Invalid/expired token
