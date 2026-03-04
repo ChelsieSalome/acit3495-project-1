@@ -1,6 +1,8 @@
 # acit3495-project-1
 
-* Salome Chelsie Lele Wambo - A01372274
+* Salome Chelsie Lele Wambo
+* Jaskirat Gill
+* Jessica
 
 ## Overview
 
