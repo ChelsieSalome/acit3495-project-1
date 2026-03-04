@@ -2,7 +2,7 @@
 
 * Salome Chelsie Lele Wambo
 * Jaskirat Gill
-* Jessica
+* Jessica Shokouhi
 
 ## Overview
 
